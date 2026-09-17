@@ -17,7 +17,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 import { configurePassport } from './modules/auth/passport.config';
 import { startBackupScheduler } from './modules/backups/backups.service';
-import { syncToReplica } from './modules/replication/replication.service';
+import { syncToReplica, getNativeReplicationRules } from './modules/replication/replication.service';
 import cron from 'node-cron';
 
 import authRoutes from './modules/auth/auth.routes';
@@ -72,13 +72,23 @@ app.listen(env.PORT, () => {
   // Start background schedulers
   startBackupScheduler();
 
-  // Start MinIO replication sync every 5 minutes (local dev only)
-  if (env.S3_ENDPOINT) {
+  // Replication: prefer native S3 replication when the bucket has a rule,
+  // otherwise run the application-level sync every 5 minutes (MinIO and AWS alike).
+  void (async () => {
+    const nativeRules = await getNativeReplicationRules(true);
+    if (nativeRules) {
+      logger.info(`Native S3 replication active on ${env.S3_PRIMARY_BUCKET}: ${nativeRules.join(', ')}`);
+      return;
+    }
     cron.schedule('*/5 * * * *', () => {
       syncToReplica().catch((err) => logger.error('Replication sync error', { err }));
     });
-    logger.info('MinIO replication sync scheduled every 5 minutes');
-  }
+    logger.info(
+      env.S3_ENDPOINT
+        ? 'MinIO replication sync scheduled every 5 minutes'
+        : 'No native S3 replication rule found — application-level sync scheduled every 5 minutes'
+    );
+  })();
 });
 
 export default app;

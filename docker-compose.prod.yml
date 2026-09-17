@@ -55,7 +55,7 @@ services:
       NODE_ENV: production
     ports:
       - '3000:3000'
-    command: npm run dev -- -p 3000 -H 0.0.0.0
+    command: sh -c "npm run build && npm start -- -p 3000 -H 0.0.0.0"
 
 volumes:
   postgres_data:
