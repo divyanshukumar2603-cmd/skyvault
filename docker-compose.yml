@@ -75,7 +75,6 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://cloudvault:cloudvault_password@postgres:5432/cloudvault
-      S3_ENDPOINT: http://minio:9000
     ports:
       - '4000:4000'
     volumes:
