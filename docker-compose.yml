@@ -1,0 +1,111 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: cloudvault-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cloudvault
+      POSTGRES_USER: cloudvault
+      POSTGRES_PASSWORD: cloudvault_password
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cloudvault -d cloudvault']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Object Storage
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: cloudvault-minio
+    restart: unless-stopped
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Init (creates buckets + enables versioning)
+  minio-init:
+    image: quay.io/minio/mc:latest
+    container_name: cloudvault-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 minioadmin minioadmin123;
+        mc mb --ignore-existing local/cloudvault-primary;
+        mc mb --ignore-existing local/cloudvault-replica;
+        mc mb --ignore-existing local/cloudvault-backups;
+        mc version enable local/cloudvault-primary;
+        mc version enable local/cloudvault-replica;
+        mc version enable local/cloudvault-backups;
+        echo 'MinIO buckets initialized successfully';
+      "
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: cloudvault-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://cloudvault:cloudvault_password@postgres:5432/cloudvault
+      S3_ENDPOINT: http://minio:9000
+    ports:
+      - '4000:4000'
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+    command: sh -c "npx prisma db push && npm run dev"
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: cloudvault-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./frontend/app:/app/app
+      - ./frontend/components:/app/components
+      - ./frontend/lib:/app/lib
+      - ./frontend/hooks:/app/hooks
+      - ./frontend/public:/app/public
+    command: npm run dev -- -p 3000
+
+volumes:
+  postgres_data:
+  minio_data:

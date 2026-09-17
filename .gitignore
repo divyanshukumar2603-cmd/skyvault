@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables
+.env
+.env*.local
+!.env.example
+
+# Next.js & Build outputs
+.next/
+out/
+dist/
+build/
+
+# Testing
+coverage/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.pem
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Python / Virtualenv
+.venv

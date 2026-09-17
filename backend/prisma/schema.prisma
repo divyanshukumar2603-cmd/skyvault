@@ -1,0 +1,139 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ─────────────────────────────────────────────────────────
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?  // null for OAuth-only users
+  displayName  String?
+  avatarUrl    String?
+  storageUsed  BigInt   @default(0) // bytes
+  storageQuota BigInt   @default(10737418240) // 10 GB in bytes
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  files         File[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  oauthAccounts OAuthAccount[]
+
+  @@index([email])
+}
+
+// ─── OAuth Accounts ────────────────────────────────────────────────
+model OAuthAccount {
+  id             String    @id @default(cuid())
+  userId         String
+  provider       String    // "google" | "github"
+  providerUserId String    // ID from the OAuth provider
+  accessToken    String?
+  refreshToken   String?
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+// ─── Refresh Tokens ────────────────────────────────────────────────
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique // hashed token
+  familyId  String   // rotation family — reuse of old token revokes entire family
+  isUsed    Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+// ─── Files ─────────────────────────────────────────────────────────
+model File {
+  id             String    @id @default(cuid())
+  userId         String
+  fileName       String    // display name
+  s3Key          String    // current version S3 key
+  filePath       String    // logical path within user's vault (e.g. "documents/report.pdf")
+  mimeType       String
+  sizeBytes      BigInt
+  currentVersion Int       @default(1)
+  isDeleted      Boolean   @default(false)
+  deletedAt      DateTime?
+  tags           Json?     // {"project": "X", "priority": "high"}
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions  FileVersion[]
+  auditLogs AuditLog[]
+
+  @@unique([userId, filePath]) // one active file per path per user
+  @@index([userId, isDeleted])
+  @@index([userId, createdAt])
+}
+
+// ─── File Versions ─────────────────────────────────────────────────
+model FileVersion {
+  id            String   @id @default(cuid())
+  fileId        String
+  versionNumber Int      // 1, 2, 3...
+  s3Key         String   // versioned S3 key: users/{userId}/{filePath}/v{n}/{fileName}
+  s3VersionId   String?  // native S3 version ID (if bucket versioning is on)
+  sizeBytes     BigInt
+  checksum      String?  // SHA-256 hex
+  uploadedAt    DateTime @default(now())
+
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, versionNumber])
+  @@index([fileId])
+}
+
+// ─── Audit Logs ────────────────────────────────────────────────────
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  fileId    String?
+  action    String   // UPLOAD, DOWNLOAD, DELETE, RESTORE, RENAME, VERSION_RESTORE, BACKUP, etc.
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  file File? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([fileId])
+}
+
+// ─── Backup Records ────────────────────────────────────────────────
+model BackupRecord {
+  id          String    @id @default(cuid())
+  bucketName  String
+  s3Prefix    String    // e.g. "backups/2024-01-15/"
+  sizeBytes   BigInt    @default(0)
+  fileCount   Int       @default(0)
+  status      String    @default("PENDING") // PENDING | IN_PROGRESS | COMPLETED | FAILED
+  triggeredBy String    // "SCHEDULED" | "MANUAL"
+  errorMsg    String?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([startedAt])
+}
