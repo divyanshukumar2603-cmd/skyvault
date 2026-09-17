@@ -5,6 +5,7 @@ import * as authController from './auth.controller';
 import { authenticate } from '../../middleware/auth';
 import { authLimiter, oauthLimiter } from '../../middleware/rateLimiter';
 import { AuthenticatedRequest } from '../../types';
+import { env } from '../../config/env';
 
 const router = Router();
 
@@ -26,11 +27,21 @@ router.get('/me', authenticate as any, (req: any, res: any, next: any) =>
 router.get(
   '/google',
   oauthLimiter,
-  passport.authenticate('google', { session: false, scope: ['profile', 'email'] })
+  (req, res, next) => {
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+      return res.redirect(`${env.FRONTEND_URL}/login?error=google_not_configured`);
+    }
+    passport.authenticate('google', { session: false, scope: ['profile', 'email'] })(req, res, next);
+  }
 );
 router.get(
   '/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: '/login?error=google_failed' }),
+  (req, res, next) => {
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+      return res.redirect(`${env.FRONTEND_URL}/login?error=google_not_configured`);
+    }
+    passport.authenticate('google', { session: false, failureRedirect: `${env.FRONTEND_URL}/login?error=google_failed` })(req, res, next);
+  },
   authController.oauthCallback
 );
 
@@ -38,11 +49,21 @@ router.get(
 router.get(
   '/github',
   oauthLimiter,
-  passport.authenticate('github', { session: false, scope: ['user:email'] })
+  (req, res, next) => {
+    if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) {
+      return res.redirect(`${env.FRONTEND_URL}/login?error=github_not_configured`);
+    }
+    passport.authenticate('github', { session: false, scope: ['user:email'] })(req, res, next);
+  }
 );
 router.get(
   '/github/callback',
-  passport.authenticate('github', { session: false, failureRedirect: '/login?error=github_failed' }),
+  (req, res, next) => {
+    if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) {
+      return res.redirect(`${env.FRONTEND_URL}/login?error=github_not_configured`);
+    }
+    passport.authenticate('github', { session: false, failureRedirect: `${env.FRONTEND_URL}/login?error=github_failed` })(req, res, next);
+  },
   authController.oauthCallback
 );
 
