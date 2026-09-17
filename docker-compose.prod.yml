@@ -1,0 +1,61 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: cloudvault-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: cloudvault
+      POSTGRES_USER: cloudvault
+      POSTGRES_PASSWORD: cloudvault_password
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cloudvault -d cloudvault']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: cloudvault-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://cloudvault:cloudvault_password@postgres:5432/cloudvault
+      NODE_ENV: production
+    ports:
+      - '4000:4000'
+    command: sh -c "npx prisma db push && npm run dev"
+
+  # Frontend Web UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: cloudvault-frontend
+    restart: always
+    depends_on:
+      - backend
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+    ports:
+      - '3000:3000'
+    command: npm run dev -- -p 3000 -H 0.0.0.0
+
+volumes:
+  postgres_data:
