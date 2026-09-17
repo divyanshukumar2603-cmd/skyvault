@@ -23,6 +23,7 @@ export const env = {
   S3_ENDPOINT: optional('S3_ENDPOINT'),        // set for MinIO, empty for AWS
   S3_ACCESS_KEY_ID: required('S3_ACCESS_KEY_ID'),
   S3_SECRET_ACCESS_KEY: required('S3_SECRET_ACCESS_KEY'),
+  AWS_SESSION_TOKEN: optional('AWS_SESSION_TOKEN'),
   AWS_REGION: optional('AWS_REGION', 'us-east-1'),
   S3_PRIMARY_BUCKET: required('S3_PRIMARY_BUCKET'),
   S3_REPLICA_BUCKET: required('S3_REPLICA_BUCKET'),

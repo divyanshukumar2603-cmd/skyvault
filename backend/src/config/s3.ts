@@ -1,13 +1,16 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import { env } from './env';
 
+const credentials = {
+  accessKeyId: env.S3_ACCESS_KEY_ID,
+  secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+  ...(env.AWS_SESSION_TOKEN ? { sessionToken: env.AWS_SESSION_TOKEN } : {}),
+};
+
 // S3 client for backend internal operations (headObject, copyObject, listObjects, delete)
 export const s3Client = new S3Client({
   region: env.AWS_REGION,
-  credentials: {
-    accessKeyId: env.S3_ACCESS_KEY_ID,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-  },
+  credentials,
   ...(env.S3_ENDPOINT
     ? {
         endpoint: env.S3_ENDPOINT,
@@ -27,10 +30,7 @@ const publicEndpoint =
 
 export const s3PresignerClient = new S3Client({
   region: env.AWS_REGION,
-  credentials: {
-    accessKeyId: env.S3_ACCESS_KEY_ID,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-  },
+  credentials,
   ...(publicEndpoint
     ? {
         endpoint: publicEndpoint,
