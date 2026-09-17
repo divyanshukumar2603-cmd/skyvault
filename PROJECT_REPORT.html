@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudVault - Academic Project Report</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    @media print {
+      body {
+        background: #fff !important;
+        color: #000 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .markdown-body {
+        max-width: 100% !important;
+        padding: 0 !important;
+      }
+      pre, blockquote, img, table, .mermaid {
+        page-break-inside: avoid;
+      }
+      h1, h2, h3 {
+        page-break-after: avoid;
+      }
+    }
+    body {
+      box-sizing: border-box;
+      min-width: 200px;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 45px 20px;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    }
+    .markdown-body {
+      background: transparent !important;
+      color: #c9d1d9 !important;
+    }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+      color: #58a6ff !important;
+      border-bottom-color: #30363d !important;
+    }
+    .markdown-body table tr {
+      background-color: #161b22 !important;
+      border-top-color: #30363d !important;
+    }
+    .markdown-body table tr:nth-child(2n) {
+      background-color: #0d1117 !important;
+    }
+    .markdown-body table td, .markdown-body table th {
+      border-color: #30363d !important;
+      padding: 10px 14px;
+    }
+    .markdown-body code {
+      background-color: rgba(110,118,129,0.2) !important;
+      color: #e6edf3 !important;
+    }
+    .markdown-body pre {
+      background-color: #161b22 !important;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+    }
+    .markdown-body img {
+      background: transparent;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      margin: 16px 0 6px 0;
+      max-width: 100%;
+    }
+    .markdown-body blockquote {
+      border-left-color: #58a6ff;
+      color: #8b949e;
+      background: #161b22;
+      padding: 8px 16px;
+      border-radius: 0 8px 8px 0;
+    }
+    .print-banner {
+      position: sticky;
+      top: 15px;
+      z-index: 100;
+      background: rgba(33, 38, 45, 0.95);
+      backdrop-filter: blur(8px);
+      border: 1px solid #388bfd;
+      border-radius: 8px;
+      padding: 12px 20px;
+      margin-bottom: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .print-btn {
+      background: #238636;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: background 0.2s ease;
+    }
+    .print-btn:hover {
+      background: #2ea043;
+    }
+    .mermaid {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px 0;
+      display: flex;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-banner no-print">
+    <div>
+      <strong style="color: #58a6ff; font-size: 15px;">CloudVault Academic Submission Report</strong>
+      <span style="color: #8b949e; margin-left: 10px; font-size: 13px;">Author: Divyanshu Kumar</span>
+    </div>
+    <button class="print-btn" onclick="window.print()">Print / Save as PDF (Cmd + P)</button>
+  </div>
+
+  <article id="content" class="markdown-body"></article>
+
+  <script>
+    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+
+    fetch('PROJECT_REPORT.md')
+      .then(res => res.text())
+      .then(async (markdown) => {
+        const renderer = new marked.Renderer();
+        
+        // Custom renderer for code blocks to handle mermaid
+        const origCodeRenderer = renderer.code.bind(renderer);
+        renderer.code = function(code, language) {
+          if (language === 'mermaid') {
+            return `<div class="mermaid">${code}</div>`;
+          }
+          return origCodeRenderer(code, language);
+        };
+
+        marked.setOptions({
+          renderer: renderer,
+          highlight: function(code, lang) {
+            const language = highlight.getLanguage(lang) ? lang : 'plaintext';
+            return highlight.highlight(code, { language }).value;
+          },
+          breaks: false,
+          gfm: true
+        });
+
+        document.getElementById('content').innerHTML = marked.parse(markdown);
+        await mermaid.run();
+      })
+      .catch(err => {
+        document.getElementById('content').innerHTML = '<p style="color:red">Failed to load PROJECT_REPORT.md. Please serve this via a web server or view PROJECT_REPORT.md directly.</p>';
+      });
+  </script>
+</body>
+</html>
