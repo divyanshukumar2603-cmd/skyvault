@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 let accessToken: string | null = null;
 
@@ -38,18 +38,33 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
-async function tryRefresh(): Promise<boolean> {
-  try {
-    const data: any = await fetch(`${API_BASE}/api/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    }).then(r => r.json());
-    if (data?.data?.accessToken) {
-      setAccessToken(data.data.accessToken);
-      return true;
+// A page load fires several requests at once. Without single-flighting, each
+// 401 would start its own refresh, the second would present an already-used
+// token, and the server's reuse detection would revoke the whole token family
+// and log the user out. All callers share one in-flight refresh instead.
+let refreshInFlight: Promise<boolean> | null = null;
+
+export function tryRefresh(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const data: any = await fetch(`${API_BASE}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      }).then((r) => r.json());
+      if (data?.data?.accessToken) {
+        setAccessToken(data.data.accessToken);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
-    return false;
-  } catch { return false; }
+  })();
+
+  refreshInFlight.finally(() => { refreshInFlight = null; });
+  return refreshInFlight;
 }
 
 // ─── Auth ────────────────────────────────────────────────────────
@@ -104,4 +119,34 @@ export const backupsApi = {
 export const replicationApi = {
   status: () => request<any>('/api/replication/status'),
   trigger: () => request<any>('/api/replication/trigger', { method: 'POST' }),
+};
+
+// ─── Products (personalized ranking) ─────────────────────────────
+export const productsApi = {
+  list: (params?: { category?: string; search?: string }) => {
+    const qs = params && Object.keys(params).length
+      ? '?' + new URLSearchParams(params as Record<string, string>).toString()
+      : '';
+    return request<any>(`/api/products${qs}`);
+  },
+  categories: () => request<any>('/api/products/categories'),
+  insights: () => request<any>('/api/products/insights'),
+  get: (id: string) => request<any>(`/api/products/${id}`),
+  interact: (id: string, type: 'VIEW' | 'CLICK' | 'CART' | 'PURCHASE', rank?: number) =>
+    request<any>(`/api/products/${id}/interactions`, {
+      method: 'POST',
+      body: JSON.stringify(rank ? { type, rank } : { type }),
+    }),
+  resetHistory: () => request<any>('/api/products/history', { method: 'DELETE' }),
+};
+
+// ─── Analytics ───────────────────────────────────────────────────
+export const analyticsApi = {
+  dashboard: (days = 30) => request<any>(`/api/analytics?days=${days}`),
+  overview: (days = 30) => request<any>(`/api/analytics/overview?days=${days}`),
+  funnel: (days = 30) => request<any>(`/api/analytics/funnel?days=${days}`),
+  topProducts: (days = 30, limit = 10) => request<any>(`/api/analytics/top-products?days=${days}&limit=${limit}`),
+  categories: (days = 30) => request<any>(`/api/analytics/categories?days=${days}`),
+  trend: (days = 14) => request<any>(`/api/analytics/trend?days=${days}`),
+  effectiveness: (days = 30) => request<any>(`/api/analytics/ranking-effectiveness?days=${days}`),
 };

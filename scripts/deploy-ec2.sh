@@ -137,6 +137,9 @@ echo "==> 6/6 Building and starting containers"
 "${SSH[@]}" "cd ${REMOTE_DIR} && sudo docker compose -f docker-compose.prod.yml up -d --build"
 "${SSH[@]}" "cd ${REMOTE_DIR} && sudo docker compose -f docker-compose.prod.yml ps"
 
+echo "==> Seeding product catalogue (idempotent)"
+"${SSH[@]}" "cd ${REMOTE_DIR} && sudo docker compose -f docker-compose.prod.yml exec -T backend npm run seed:products" 2>&1 | tail -8
+
 cat <<EOF
 
 Deployed.

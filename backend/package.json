@@ -13,7 +13,8 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "seed:products": "ts-node prisma/seed-products.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",

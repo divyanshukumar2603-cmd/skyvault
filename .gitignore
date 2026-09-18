@@ -3,9 +3,9 @@ node_modules/
 .pnp
 .pnp.js
 
-# Environment variables
-.env
-.env*.local
+# Environment variables — every variant is secret except the checked-in example.
+# (scripts/update-aws-creds.sh writes .env.bak, which holds real credentials.)
+.env*
 !.env.example
 
 # Next.js & Build outputs

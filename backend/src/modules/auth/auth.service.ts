@@ -2,7 +2,7 @@ import argon2 from 'argon2';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../../config/db';
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../utils/jwt';
+import { signAccessToken } from '../../utils/jwt';
 import { AppError } from '../../middleware/errorHandler';
 import { logger } from '../../utils/logger';
 
@@ -40,22 +40,17 @@ export async function loginUser(email: string, password: string) {
 }
 
 export async function refreshTokens(rawToken: string) {
-  let payload: { userId: string; familyId: string };
-  try {
-    payload = verifyRefreshToken(rawToken);
-  } catch {
-    throw new AppError(401, 'Invalid refresh token');
-  }
-
+  // Refresh tokens are opaque (see issueTokenPair), not JWTs: they carry no
+  // payload, so the stored row is the sole source of identity and family.
   const tokenHash = hashToken(rawToken);
   const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
 
-  if (!stored) throw new AppError(401, 'Refresh token not found');
+  if (!stored) throw new AppError(401, 'Invalid refresh token');
 
   // Reuse detection: revoke entire family
   if (stored.isUsed) {
-    await prisma.refreshToken.deleteMany({ where: { familyId: payload.familyId } });
-    logger.warn('Refresh token reuse detected — revoked family', { familyId: payload.familyId });
+    await prisma.refreshToken.deleteMany({ where: { familyId: stored.familyId } });
+    logger.warn('Refresh token reuse detected — revoked family', { familyId: stored.familyId });
     throw new AppError(401, 'Refresh token reuse detected. Please log in again.');
   }
 
@@ -70,7 +65,7 @@ export async function refreshTokens(rawToken: string) {
   const user = await prisma.user.findUnique({ where: { id: stored.userId } });
   if (!user) throw new AppError(401, 'User not found');
 
-  return issueTokenPair(user.id, user.email, payload.familyId);
+  return issueTokenPair(user.id, user.email, stored.familyId);
 }
 
 export async function logoutUser(rawToken: string) {

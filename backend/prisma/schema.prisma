@@ -12,7 +12,7 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
-  passwordHash String?  // null for OAuth-only users
+  passwordHash String? // null for OAuth-only users
   displayName  String?
   avatarUrl    String?
   storageUsed  BigInt   @default(0) // bytes
@@ -24,6 +24,7 @@ model User {
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
   oauthAccounts OAuthAccount[]
+  interactions  ProductInteraction[]
 
   @@index([email])
 }
@@ -32,8 +33,8 @@ model User {
 model OAuthAccount {
   id             String    @id @default(cuid())
   userId         String
-  provider       String    // "google" | "github"
-  providerUserId String    // ID from the OAuth provider
+  provider       String // "google" | "github"
+  providerUserId String // ID from the OAuth provider
   accessToken    String?
   refreshToken   String?
   expiresAt      DateTime?
@@ -51,7 +52,7 @@ model RefreshToken {
   id        String   @id @default(cuid())
   userId    String
   tokenHash String   @unique // hashed token
-  familyId  String   // rotation family — reuse of old token revokes entire family
+  familyId  String // rotation family — reuse of old token revokes entire family
   isUsed    Boolean  @default(false)
   expiresAt DateTime
   createdAt DateTime @default(now())
@@ -66,15 +67,15 @@ model RefreshToken {
 model File {
   id             String    @id @default(cuid())
   userId         String
-  fileName       String    // display name
-  s3Key          String    // current version S3 key
-  filePath       String    // logical path within user's vault (e.g. "documents/report.pdf")
+  fileName       String // display name
+  s3Key          String // current version S3 key
+  filePath       String // logical path within user's vault (e.g. "documents/report.pdf")
   mimeType       String
   sizeBytes      BigInt
   currentVersion Int       @default(1)
   isDeleted      Boolean   @default(false)
   deletedAt      DateTime?
-  tags           Json?     // {"project": "X", "priority": "high"}
+  tags           Json? // {"project": "X", "priority": "high"}
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -91,11 +92,11 @@ model File {
 model FileVersion {
   id            String   @id @default(cuid())
   fileId        String
-  versionNumber Int      // 1, 2, 3...
-  s3Key         String   // versioned S3 key: users/{userId}/{filePath}/v{n}/{fileName}
-  s3VersionId   String?  // native S3 version ID (if bucket versioning is on)
+  versionNumber Int // 1, 2, 3...
+  s3Key         String // versioned S3 key: users/{userId}/{filePath}/v{n}/{fileName}
+  s3VersionId   String? // native S3 version ID (if bucket versioning is on)
   sizeBytes     BigInt
-  checksum      String?  // SHA-256 hex
+  checksum      String? // SHA-256 hex
   uploadedAt    DateTime @default(now())
 
   file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
@@ -109,7 +110,7 @@ model AuditLog {
   id        String   @id @default(cuid())
   userId    String
   fileId    String?
-  action    String   // UPLOAD, DOWNLOAD, DELETE, RESTORE, RENAME, VERSION_RESTORE, BACKUP, etc.
+  action    String // UPLOAD, DOWNLOAD, DELETE, RESTORE, RENAME, VERSION_RESTORE, BACKUP, etc.
   details   Json?
   ipAddress String?
   createdAt DateTime @default(now())
@@ -125,15 +126,69 @@ model AuditLog {
 model BackupRecord {
   id          String    @id @default(cuid())
   bucketName  String
-  s3Prefix    String    // e.g. "backups/2024-01-15/"
+  s3Prefix    String // e.g. "backups/2024-01-15/"
   sizeBytes   BigInt    @default(0)
   fileCount   Int       @default(0)
   status      String    @default("PENDING") // PENDING | IN_PROGRESS | COMPLETED | FAILED
-  triggeredBy String    // "SCHEDULED" | "MANUAL"
+  triggeredBy String // "SCHEDULED" | "MANUAL"
   errorMsg    String?
   startedAt   DateTime  @default(now())
   completedAt DateTime?
 
   @@index([status])
   @@index([startedAt])
+}
+
+// ─── Products ──────────────────────────────────────────────────────
+// Catalogue powering the personalized ranking engine. Product imagery is
+// stored in the same S3 primary bucket as user files, so the storage layer
+// and the ranking layer share one pipeline.
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  category    String // "Electronics", "Fashion", ...
+  brand       String
+  price       Decimal  @db.Decimal(10, 2)
+  rating      Float    @default(0) // 0.0 - 5.0 average customer rating
+  ratingCount Int      @default(0)
+  imageS3Key  String? // key in the primary bucket, null => UI renders a placeholder
+  inStock     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  interactions ProductInteraction[]
+
+  @@index([category])
+  @@index([brand])
+  @@index([price])
+}
+
+// ─── Product Interactions ──────────────────────────────────────────
+// Every signal the ranking engine learns from. Weighted and time-decayed
+// at scoring time rather than stored pre-aggregated, so the model can be
+// re-tuned without rewriting history.
+model ProductInteraction {
+  id        String          @id @default(cuid())
+  userId    String
+  productId String
+  type      InteractionType
+  // Position the product occupied when the user acted on it. Lets analytics
+  // measure whether the ranking surfaces what people actually buy.
+  rankAtInteraction Int?
+  createdAt DateTime        @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([productId])
+  @@index([userId, productId])
+}
+
+enum InteractionType {
+  VIEW
+  CLICK
+  CART
+  PURCHASE
 }

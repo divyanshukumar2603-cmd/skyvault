@@ -25,6 +25,8 @@ import filesRoutes from './modules/files/files.routes';
 import versionsRoutes from './modules/versions/versions.routes';
 import replicationRoutes from './modules/replication/replication.routes';
 import backupsRoutes from './modules/backups/backups.routes';
+import productsRoutes from './modules/products/products.routes';
+import analyticsRoutes from './modules/analytics/analytics.routes';
 
 const app = express();
 
@@ -57,6 +59,8 @@ app.use('/api/files', filesRoutes);
 app.use('/api/files/:id/versions', versionsRoutes);
 app.use('/api/replication', replicationRoutes);
 app.use('/api/backups', backupsRoutes);
+app.use('/api/products', productsRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // ─── 404 Handler ────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ success: false, error: 'Route not found' }));

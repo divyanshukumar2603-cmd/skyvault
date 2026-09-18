@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Files, Database, Settings, LogOut, Shield, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
-import { authApi, setAccessToken, getAccessToken } from '@/lib/api';
+import { Files, Database, Settings, LogOut, Shield, ChevronLeft, ChevronRight, RefreshCw, Sparkles, BarChart3 } from 'lucide-react';
+import { authApi, setAccessToken, getAccessToken, tryRefresh } from '@/lib/api';
 import { logout } from '@/lib/auth';
 
 const NAV = [
   { href: '/files',    icon: Files,      label: 'Files' },
+  { href: '/shop',     icon: Sparkles,   label: 'Shop' },
+  { href: '/analytics',icon: BarChart3,  label: 'Analytics' },
   { href: '/backups',  icon: Database,   label: 'Backups' },
   { href: '/settings', icon: Settings,   label: 'Settings' },
 ];
@@ -25,11 +27,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       try {
         // Try to refresh token first if no access token
         if (!getAccessToken()) {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/refresh`, {
-            method: 'POST', credentials: 'include'
-          }).then(r => r.json());
-          if (res?.data?.accessToken) setAccessToken(res.data.accessToken);
-          else { router.replace('/login'); return; }
+          const refreshed = await tryRefresh();
+          if (!refreshed) { router.replace('/login'); return; }
         }
         const me = await authApi.me();
         setUser(me.data);
